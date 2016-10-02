@@ -17,9 +17,8 @@ window.onload = function () {
     }
 
     // global state
-    var previousEdits = new Array();
-    var futureEdits = new Array();
-    var brushSize = 5;
+    var previousEdits = new Array(); // for undo
+    var futureEdits = new Array(); // for redo
     var mouseDown = false;
 
     var canvas = document.getElementById("main");
@@ -28,11 +27,13 @@ window.onload = function () {
     var brushSizePicker = document.getElementById("brushsize");
     var undoButton = document.getElementById("undo");
     var redoButton = document.getElementById("redo");
+
+    // these make reasonably smooth lines, and we do not change them.
     context.lineJoin = "round";
+    context.lineCap = "round";
 
     function drawPoint(point) {
         context.lineTo(point.x, point.y);
-        context.stroke();
     } 
 
     function drawEdit(edit) {
@@ -40,18 +41,14 @@ window.onload = function () {
         context.lineWidth = edit.brushSize;
         context.beginPath();
         context.moveTo(edit.points[0].x, edit.points[0].y);
-        for (var i = 0; i < edit.points.length; ++i) {
-            drawPoint(edit.points[i]);
-        }
+        edit.points.forEach(drawPoint);
+        context.stroke();
         context.closePath();
     };
 
 
     function redraw() {
         context.clearRect(0, 0, canvas.width, canvas.height);
-        previousEdits.forEach(function (thing) {
-            console.log(thing);
-        });
         previousEdits.forEach(drawEdit);
     };
 
@@ -79,22 +76,16 @@ window.onload = function () {
 
     function endPaint() {
         mouseDown = false;
-        context.closePath();
     }
 
     canvas.addEventListener("mousedown", function (e) {
         mouseDown = true;
         var point = new Point(e.pageX - this.offsetLeft, e.pageY - this.offsetTop);
-        var color = colorPicker.value
-        var newEdit = new EditState(brushSize, point, color);
-        context.strokeStyle = color;
-        context.lineWidth = brushSizePicker.value;
-        context.beginPath();
-        // Gotta start from somewhere, so we start "imperceptibly" slightly off
-        context.moveTo(point.x - 1, point.y); 
-        drawPoint(point);
+        var newEdit = new EditState(brushSizePicker.value, point, colorPicker.value);
         previousEdits.push(newEdit);
         undoButton.disabled = false;
+        drawEdit(newEdit);
+
     })
 
     canvas.addEventListener("mouseup", function (event) {
@@ -105,12 +96,9 @@ window.onload = function () {
         if (!mouseDown) { return; }
 
         var lastEdit = previousEdits[previousEdits.length - 1];
-        var lastPoint = lastEdit.points[lastEdit.points.length - 1];
         var point = new Point(event.pageX - this.offsetLeft, event.pageY - this.offsetTop);
         lastEdit.addPoint(point);
-        
-        context.moveTo(lastPoint.x, lastPoint.y);
-        drawPoint(point);
+        drawEdit(lastEdit);
     });
 
     canvas.addEventListener("mouseleave", function (event) {
